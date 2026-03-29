@@ -5,24 +5,29 @@ using UnityEngine.InputSystem; //import que permite usar o nome input system da 
 
 public class player_moviment : MonoBehaviour
 {
-    public PlayerInput playerInput;
+    public GameObject slashEffect;
+    public Animator attackAnim;
     public bool teste = true;
+
+
+    [Header("Components")]
+    public PlayerInput playerInput;
     public Rigidbody2D rb;
     public Animator anim;
-    public Animator attackAnim;
-    public GameObject slashEffect;
 
+    
     [Header("Movement Variable")]
+    private bool moving = false;
+    private bool idle = false;
+    private bool isAttacking = false;
+    private bool jumping = false; 
     public float velocity;
     public float jumpForce;
     public float jumpCutMultiplier = .9f;
     public float normalGravity;
     public float fallGravity;
     public float jumpGravity;
-    private bool isAttacking = false;
     private int facingDirection = 1;
-
-
 
 
     [Header("Ground Check")]
@@ -34,7 +39,7 @@ public class player_moviment : MonoBehaviour
 
     [Header("Slide Settings")]
     public float slideDuration = .6f;
-    private bool sliding;
+    private bool isSliding;
     private float slideTimer;
     public Vector2 moveInput;
     private bool jumpPressed;
@@ -51,13 +56,19 @@ public class player_moviment : MonoBehaviour
     void Update()
     {
         Flip();
+        HandleAnimations();
+        HandleSlide();
     }
 
     void FixedUpdate()
     {   
         ApplyVariableGravity();
         CheckGrounded();
-        HandleMoviment();
+
+        if (!isSliding)
+        {
+            HandleMoviment();
+        }
         HandleJump();     
     }
 
@@ -80,6 +91,28 @@ public class player_moviment : MonoBehaviour
     {
         isGrounded = Physics2D.OverlapCircle(groundCheck.position,groundCheckRadius,groundLayer);
     }
+
+    void HandleAnimations()
+    {
+        anim.SetBool("sliding",isSliding && isGrounded);
+        anim.SetBool("isAttacking",isAttacking && !isSliding);
+        anim.SetBool("isIdle", Math.Abs(moveInput.x) < .1f && isGrounded && !isAttacking && !isSliding);
+        anim.SetBool("moving", Math.Abs(moveInput.x) > .1f && isGrounded && !isAttacking && !isSliding);
+        anim.SetBool("jumping", isGrounded == false && !isAttacking);
+    }
+
+    private void HandleSlide()
+        {
+            if (isSliding)
+            {
+                slideTimer -= Time.deltaTime;
+                if(slideTimer <= 0)
+                {
+                    isSliding = false;
+                }   
+            }
+    }
+
     private void HandleMoviment()
     {
         {
@@ -90,20 +123,7 @@ public class player_moviment : MonoBehaviour
                 if (isAttacking)
                 {
                     rb.linearVelocity = new Vector2(targetSpeed,rb.linearVelocity.y) * 0;
-                }
-                else
-                {
-                    anim.SetBool("moving",true);
-                    anim.SetBool("isIdle",false);
-                    anim.SetBool("jumping",false);
-                }
-                    
-            }
-            else if(isGrounded)
-            {
-                anim.SetBool("isIdle",true);
-                anim.SetBool("moving",false);
-                anim.SetBool("jumping",false);
+                } 
             }
         }
         
@@ -116,9 +136,6 @@ public class player_moviment : MonoBehaviour
             rb.linearVelocity = new Vector2(rb.linearVelocity.x,jumpForce);
             jumpPressed = false;
             jumpReleased = false;
-            anim.SetBool("isIdle",false);
-            anim.SetBool("moving",false);
-            anim.SetBool("jumping",true);
         }
         if (jumpReleased)
         {
@@ -137,14 +154,9 @@ public class player_moviment : MonoBehaviour
 
  public void OnAttack(InputValue value)
 {
-
     if (value.isPressed)
     {
                 isAttacking = true;
-                anim.SetBool("isAttacking", true);
-                anim.SetBool("isIdle", false);
-                anim.SetBool("jumping",false);
-                anim.SetBool("moving",false);
         
     }
 }
@@ -152,10 +164,8 @@ public class player_moviment : MonoBehaviour
     public void finishAttack()
     {
         isAttacking = false;
-        anim.SetBool("isAttacking",false);
         attackAnim.SetBool("firstAttack",false);
         slashEffect.SetActive(false);
-        anim.SetBool("isIdle",true);
     }
 
     public void OnJump (InputValue value)
@@ -168,6 +178,15 @@ public class player_moviment : MonoBehaviour
         else
         {
             jumpReleased = true;
+        }
+    }
+
+    public void OnSlide(InputValue value)
+    {
+        if (isGrounded && value.isPressed && !isSliding)
+        {
+            isSliding = true;
+            slideTimer = slideDuration;
         }
     }
 
